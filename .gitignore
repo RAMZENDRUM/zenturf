@@ -42,3 +42,6 @@ frontend.env
 
 # Scratch scripts (dev only)
 scratch/
+
+.vercel
+.env*.local

@@ -124,7 +124,7 @@ function BookPage() {
 
     let orderId = "";
     try {
-      const response = await fetch("/api/zenpay/order", {
+      const response = await fetch("https://zenturf-hr3ekhmcz-ramzendrums-projects.vercel.app/api/zenpay/order", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
