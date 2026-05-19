@@ -47,7 +47,7 @@ function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: "http://localhost:8080/",
+        redirectTo: window.location.origin,
       },
     });
     if (error) {
