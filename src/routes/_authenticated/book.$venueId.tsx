@@ -152,6 +152,37 @@ function BookPage() {
       return;
     }
 
+    const bookingsToInsert = slots.map((s) => {
+      const pricePerSlot = total / slots.length;
+      return {
+        user_id: user.id,
+        venue_id: venueId,
+        slot_id: s.id,
+        sport_type: sport || (venue.sport_tags[0] ?? null),
+        booking_date: s.date,
+        start_time: s.start_time,
+        end_time: s.end_time,
+        total_price: pricePerSlot,
+        payment_status: "pending",
+        zenpay_order_id: orderId,
+        status: "pending" as any,
+      };
+    });
+
+    const { data: insertedList, error } = await supabase
+      .from("zenturf_bookings_v2")
+      .insert(bookingsToInsert)
+      .select("id, booking_ref");
+
+    if (error || !insertedList || insertedList.length === 0) {
+      toast.error(error?.message ?? "Error saving booking. Please contact support.");
+      setPaying(false);
+      return;
+    }
+
+    const mainRef = insertedList.map((b) => b.booking_ref).join(", ");
+    const mainBooking = insertedList[0];
+
     const loaded = await loadScript("https://zenwalletcore-engine-production.up.railway.app/ZenPay-sdk.js");
     if (!loaded || !(window as any).ZenPay) {
       toast.error("Failed to load ZenPay SDK");
@@ -165,39 +196,17 @@ function BookPage() {
       onSuccess: async (paymentResult: any) => {
         toast.success("Payment Successful!");
 
-        const bookingsToInsert = slots.map((s, index) => {
-          const pricePerSlot = total / slots.length;
-          return {
-            user_id: user.id,
-            venue_id: venueId,
-            slot_id: s.id,
-            sport_type: sport || (venue.sport_tags[0] ?? null),
-            booking_date: s.date,
-            start_time: s.start_time,
-            end_time: s.end_time,
-            total_price: pricePerSlot,
-            payment_status: "paid",
-            payment_id: paymentResult.payment_id || `ZP-${Date.now()}-${index}`,
-            status: "confirmed" as any,
-          };
-        });
-
-        const { data: insertedList, error } = await supabase
+        await supabase
           .from("zenturf_bookings_v2")
-          .insert(bookingsToInsert)
-          .select("id, booking_ref");
+          .update({
+            payment_status: "paid",
+            status: "confirmed" as any,
+            payment_id: paymentResult.payment_id || `ZP-${Date.now()}`
+          })
+          .eq("zenpay_order_id", orderId);
 
         setPaying(false);
 
-        if (error || !insertedList || insertedList.length === 0) {
-          toast.error(
-            error?.message ?? "Error saving booking. Please contact support.",
-          );
-          return;
-        }
-
-        const mainRef = insertedList.map((b) => b.booking_ref).join(", ");
-        const mainBooking = insertedList[0];
         const qr = JSON.stringify({ ref: mainBooking.booking_ref, id: mainBooking.id });
         
         await supabase
