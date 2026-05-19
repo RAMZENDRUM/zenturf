@@ -3,15 +3,7 @@
   "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/assets/(.*)",
-      "destination": "/dist/client/assets/$1"
-    },
-    {
-      "source": "/(favicon.ico|robots.txt|manifest.json)",
-      "destination": "/dist/client/$1"
-    },
-    {
-      "source": "/(.*)",
+      "source": "/((?!assets/|favicon.ico|robots.txt|manifest.json).*)",
       "destination": "/api/server"
     }
   ]
