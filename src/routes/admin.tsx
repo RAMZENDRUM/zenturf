@@ -431,7 +431,7 @@ function AdminPortalPage() {
   ];
 
   return (
-    <div className="flex h-screen bg-background text-foreground overflow-hidden">
+    <div className="flex h-[calc(100dvh-128px)] lg:h-[calc(100vh-64px)] bg-background text-foreground overflow-hidden">
       {/* Sidebar - Desktop */}
       <aside className="hidden lg:flex flex-col w-64 border-r bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/30">
         <div className="p-6 border-b flex items-center gap-3">
@@ -483,7 +483,7 @@ function AdminPortalPage() {
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile Header Bar */}
-        <header className="lg:hidden h-16 border-b flex items-center justify-between px-6 bg-card/80 backdrop-blur">
+        <header className="lg:hidden h-16 border-b flex items-center justify-between px-4 sm:px-6 bg-card/80 backdrop-blur shrink-0">
           <span className="font-bold text-base text-foreground flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary" />
             ZenTurf Admin
@@ -598,49 +598,51 @@ function AdminPortalPage() {
                   </div>
 
                   <Card className="rounded-2xl border bg-card overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Customer Name</TableHead>
-                          <TableHead>User ID</TableHead>
-                          <TableHead>Authorized Role</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {usersList.map((u) => (
-                          <TableRow key={u.id}>
-                            <TableCell className="font-semibold text-foreground">
-                              {u.name || "Unnamed Player"}
-                            </TableCell>
-                            <TableCell className="font-mono text-xs text-muted-foreground">{u.id}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  u.role === "admin"
-                                    ? "destructive"
-                                    : u.role === "owner"
-                                      ? "default"
-                                      : "secondary"
-                                }
-                              >
-                                {u.role}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="rounded-lg gap-1.5"
-                                onClick={() => handleToggleUserRole(u.id, u.role || "user")}
-                              >
-                                <UserCheck className="w-3.5 h-3.5" /> Toggle Role
-                              </Button>
-                            </TableCell>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Customer Name</TableHead>
+                            <TableHead>User ID</TableHead>
+                            <TableHead>Authorized Role</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {usersList.map((u) => (
+                            <TableRow key={u.id}>
+                              <TableCell className="font-semibold text-foreground">
+                                {u.name || "Unnamed Player"}
+                              </TableCell>
+                              <TableCell className="font-mono text-xs text-muted-foreground">{u.id}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={
+                                    u.role === "admin"
+                                      ? "destructive"
+                                      : u.role === "owner"
+                                        ? "default"
+                                        : "secondary"
+                                  }
+                                >
+                                  {u.role}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="rounded-lg gap-1.5"
+                                  onClick={() => handleToggleUserRole(u.id, u.role || "user")}
+                                >
+                                  <UserCheck className="w-3.5 h-3.5" /> Toggle Role
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </Card>
                 </div>
               )}
@@ -654,54 +656,56 @@ function AdminPortalPage() {
                   </div>
 
                   <Card className="rounded-2xl border bg-card overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Venue Name</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Location</TableHead>
-                          <TableHead>Hourly Price</TableHead>
-                          <TableHead>Rating</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {venues.length === 0 ? (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
                           <TableRow>
-                            <TableCell colSpan={7} className="text-center py-10 text-sm text-muted-foreground">
-                              No venues registered on the platform.
-                            </TableCell>
+                            <TableHead>Venue Name</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Location</TableHead>
+                            <TableHead>Hourly Price</TableHead>
+                            <TableHead>Rating</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                           </TableRow>
-                        ) : (
-                          venues.map((v) => (
-                            <TableRow key={v.id}>
-                              <TableCell className="font-semibold text-foreground">{v.name}</TableCell>
-                              <TableCell>{v.type}</TableCell>
-                              <TableCell>{v.city}</TableCell>
-                              <TableCell className="font-bold">{formatINR(v.price_per_hour)}</TableCell>
-                              <TableCell className="font-bold">{v.rating || "N/A"}</TableCell>
-                              <TableCell>
-                                <Badge className={v.is_approved ? "bg-success text-success-foreground" : "bg-destructive/15 text-destructive"}>
-                                  {v.is_approved ? "Approved" : "Pending Approval"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {!v.is_approved ? (
-                                  <Button size="sm" onClick={() => handleApproveVenue(v.id, true)} className="rounded-lg bg-success text-success-foreground hover:bg-success/80">
-                                    Approve
-                                  </Button>
-                                ) : (
-                                  <Button size="sm" variant="outline" className="rounded-lg text-destructive hover:bg-destructive/10" onClick={() => handleApproveVenue(v.id, false)}>
-                                    Reject/Block
-                                  </Button>
-                                )}
+                        </TableHeader>
+                        <TableBody>
+                          {venues.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={7} className="text-center py-10 text-sm text-muted-foreground">
+                                No venues registered on the platform.
                               </TableCell>
                             </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
+                          ) : (
+                            venues.map((v) => (
+                              <TableRow key={v.id}>
+                                <TableCell className="font-semibold text-foreground">{v.name}</TableCell>
+                                <TableCell>{v.type}</TableCell>
+                                <TableCell>{v.city}</TableCell>
+                                <TableCell className="font-bold">{formatINR(v.price_per_hour)}</TableCell>
+                                <TableCell className="font-bold">{v.rating || "N/A"}</TableCell>
+                                <TableCell>
+                                  <Badge className={v.is_approved ? "bg-success text-success-foreground" : "bg-destructive/15 text-destructive"}>
+                                    {v.is_approved ? "Approved" : "Pending Approval"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {!v.is_approved ? (
+                                    <Button size="sm" onClick={() => handleApproveVenue(v.id, true)} className="rounded-lg bg-success text-success-foreground hover:bg-success/80">
+                                      Approve
+                                    </Button>
+                                  ) : (
+                                    <Button size="sm" variant="outline" className="rounded-lg text-destructive hover:bg-destructive/10" onClick={() => handleApproveVenue(v.id, false)}>
+                                      Reject/Block
+                                    </Button>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </Card>
                 </div>
               )}
@@ -715,44 +719,46 @@ function AdminPortalPage() {
                   </div>
 
                   <Card className="rounded-2xl border bg-card overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Reference</TableHead>
-                          <TableHead>Venue</TableHead>
-                          <TableHead>Customer</TableHead>
-                          <TableHead>Date & Time</TableHead>
-                          <TableHead>Total Amount</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {bookings.length === 0 ? (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center py-10 text-sm text-muted-foreground">
-                              No bookings found on the platform.
-                            </TableCell>
+                            <TableHead>Reference</TableHead>
+                            <TableHead>Venue</TableHead>
+                            <TableHead>Customer</TableHead>
+                            <TableHead>Date & Time</TableHead>
+                            <TableHead>Total Amount</TableHead>
+                            <TableHead>Status</TableHead>
                           </TableRow>
-                        ) : (
-                          bookings.map((b) => (
-                            <TableRow key={b.id}>
-                              <TableCell className="font-bold">{b.booking_ref}</TableCell>
-                              <TableCell className="font-semibold">{b.zenturf_venues_v2?.name}</TableCell>
-                              <TableCell>{b.profiles?.name || "Player"}</TableCell>
-                              <TableCell>
-                                {b.booking_date} @ {formatTime(b.start_time)}
-                              </TableCell>
-                              <TableCell className="font-bold">{formatINR(b.total_price)}</TableCell>
-                              <TableCell>
-                                <Badge className={b.status === "confirmed" ? "bg-success text-success-foreground" : "bg-amber-500 text-amber-950"}>
-                                  {b.status}
-                                </Badge>
+                        </TableHeader>
+                        <TableBody>
+                          {bookings.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={6} className="text-center py-10 text-sm text-muted-foreground">
+                                No bookings found on the platform.
                               </TableCell>
                             </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
+                          ) : (
+                            bookings.map((b) => (
+                              <TableRow key={b.id}>
+                                <TableCell className="font-bold">{b.booking_ref}</TableCell>
+                                <TableCell className="font-semibold">{b.zenturf_venues_v2?.name}</TableCell>
+                                <TableCell>{b.profiles?.name || "Player"}</TableCell>
+                                <TableCell>
+                                  {b.booking_date} @ {formatTime(b.start_time)}
+                                </TableCell>
+                                <TableCell className="font-bold">{formatINR(b.total_price)}</TableCell>
+                                <TableCell>
+                                  <Badge className={b.status === "confirmed" ? "bg-success text-success-foreground" : "bg-amber-500 text-amber-950"}>
+                                    {b.status}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </Card>
                 </div>
               )}

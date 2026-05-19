@@ -241,7 +241,7 @@ function BookPage() {
           return (
             <div key={label} className="flex flex-1 items-center">
               <div
-                className={`grid h-8 w-8 place-items-center rounded-full text-xs font-medium ${
+                className={`grid shrink-0 h-8 w-8 place-items-center rounded-full text-xs font-medium ${
                   done
                     ? "bg-success text-success-foreground"
                     : active
@@ -252,11 +252,11 @@ function BookPage() {
                 {done ? <Check className="h-4 w-4" /> : idx}
               </div>
               <span
-                className={`ml-2 text-sm ${active ? "font-medium" : "text-muted-foreground"}`}
+                className={`ml-2 text-[11px] sm:text-sm whitespace-nowrap ${active ? "font-bold text-foreground" : "font-medium text-muted-foreground hidden sm:block"}`}
               >
                 {label}
               </span>
-              {i < 3 && <div className="mx-2 h-px flex-1 bg-border" />}
+              {i < 3 && <div className="mx-2 h-px flex-1 bg-border shrink-0 min-w-2" />}
             </div>
           );
         })}

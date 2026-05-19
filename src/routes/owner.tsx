@@ -700,7 +700,7 @@ function OwnerPortalPage() {
   ];
 
   return (
-    <div className="flex h-screen bg-background text-foreground overflow-hidden">
+    <div className="flex h-[calc(100dvh-128px)] lg:h-[calc(100vh-64px)] bg-background text-foreground overflow-hidden">
       {/* Sidebar - Desktop */}
       <aside className="hidden lg:flex flex-col w-64 border-r bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/30">
         <div className="p-6 border-b flex items-center gap-3">
@@ -752,7 +752,7 @@ function OwnerPortalPage() {
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile Header Bar */}
-        <header className="lg:hidden h-16 border-b flex items-center justify-between px-6 bg-card/80 backdrop-blur">
+        <header className="lg:hidden h-16 border-b flex items-center justify-between px-4 sm:px-6 bg-card/80 backdrop-blur shrink-0">
           <span className="font-bold text-base text-foreground flex items-center gap-2">
             <Building2 className="h-5 w-5 text-primary" />
             ZenTurf Portal
