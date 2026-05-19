@@ -15,6 +15,14 @@
       "destination": "/dist/client/robots.txt"
     },
     {
+      "source": "/api/zenpay/order",
+      "destination": "/api/zenpay-order.js"
+    },
+    {
+      "source": "/api/zenpay/webhook",
+      "destination": "/api/zenpay-webhook.js"
+    },
+    {
       "source": "/(.*)",
       "destination": "/api/server"
     }

@@ -78,7 +78,7 @@ function BookPage() {
   const slot = slots[0];
 
   const totalHours = duration !== null ? duration : slots.length;
-  const total = totalHours * venue.price_per_hour;
+  const total = slots.reduce((sum, s) => sum + Number(s.price_override || venue.price_per_hour), 0);
 
   // Format time range
   const startStr = slot.start_time;
@@ -121,20 +121,16 @@ function BookPage() {
 
     const amountInPaise = Math.round(total * 100);
     const receiptId = `rcpt-${Date.now()}`;
-    const idempotencyKey = `idemp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
     let orderId = "";
     try {
-      const response = await fetch("https://zenwalletcore-engine-production.up.railway.app/v1/orders", {
+      const response = await fetch("/api/zenpay/order", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${import.meta.env.VITE_ZENPAY_SECRET_KEY}`,
-          "Idempotency-Key": idempotencyKey,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
           amount: amountInPaise,
-          currency: "INR",
           receipt: receiptId
         })
       });
@@ -146,9 +142,9 @@ function BookPage() {
       }
       
       const resData = await response.json();
-      orderId = resData?.data?.id || resData?.id || "";
+      orderId = resData?.orderId || "";
       if (!orderId) {
-        throw new Error(resData?.message || "Failed to retrieve order ID");
+        throw new Error("Failed to retrieve order ID from backend response");
       }
     } catch (err: any) {
       toast.error(`Order creation failed: ${err.message || err}`);
@@ -165,7 +161,7 @@ function BookPage() {
 
     const ZenPayClass = (window as any).ZenPay;
     const zenpay = new ZenPayClass({
-      key: "pk_live_dc20c4ecc9f78a6fb43218666b85",
+      key: "pk_live_36110d85cbaa8b021189378d15b3",
       onSuccess: async (paymentResult: any) => {
         toast.success("Payment Successful!");
 

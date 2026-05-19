@@ -74,6 +74,7 @@ type Slot = {
   start_time: string;
   end_time: string;
   is_booked: boolean;
+  price_override?: number | null;
 };
 
 type Review = {
@@ -133,7 +134,7 @@ function VenuePage() {
       end.setDate(end.getDate() + 7);
       const { data, error } = await supabase
         .from("zenturf_slots_v2")
-        .select("id,venue_id,date,start_time,end_time,is_booked")
+        .select("id,venue_id,date,start_time,end_time,is_booked,price_override")
         .eq("venue_id", id)
         .gte("date", start)
         .lt("date", isoDate(end))
@@ -250,7 +251,7 @@ function VenuePage() {
     
     const formattedStart = formatMinsToTime(startMins);
     const formattedEnd = formatMinsToTime(endMins);
-    const totalPrice = totalHours * venue.price_per_hour;
+    const totalPrice = selectedSlots.reduce((sum, s) => sum + Number(s.price_override || venue.price_per_hour), 0);
     
     return {
       formattedRange: `${formattedStart} – ${formattedEnd}`,
@@ -648,7 +649,7 @@ function VenuePage() {
                     {highlight === "start" && <span className="text-[9px] font-medium lowercase opacity-90 leading-none">start</span>}
                     {highlight === "end" && <span className="text-[9px] font-medium lowercase opacity-90 leading-none">end</span>}
                     <span className="font-medium tracking-tight">{formatTime(slot.start_time)}</span>
-                    <span className="text-[9px] opacity-75 font-medium leading-none mt-0.5">{formatINR(venue.price_per_hour)}</span>
+                    <span className="text-[9px] opacity-75 font-medium leading-none mt-0.5">{formatINR(slot.price_override || venue.price_per_hour)}</span>
                     {slot.is_booked && (
                       <Lock className="absolute top-1.5 right-1.5 w-3 h-3 opacity-30" />
                     )}

@@ -66,8 +66,8 @@ interface MenuItem {
   items?: SubMenuItem[];
 }
 
-export function Navbar() {
-  const { user } = useAuth();
+  export function Navbar() {
+  const { user, role } = useAuth();
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
   const [unread, setUnread] = useState(0);
@@ -322,6 +322,11 @@ export function Navbar() {
                     <DropdownMenuItem onClick={() => navigate({ to: "/owner" })} className="rounded-lg">
                       Owner Portal
                     </DropdownMenuItem>
+                    {role === "admin" && (
+                      <DropdownMenuItem onClick={() => navigate({ to: "/admin" })} className="rounded-lg">
+                        Admin Panel
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive rounded-lg">
                       <LogOut className="mr-2 h-4 w-4" /> Sign out

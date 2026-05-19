@@ -38,3 +38,7 @@ dist-ssr
 .env.development
 .env.test
 .env.*
+frontend.env
+
+# Scratch scripts (dev only)
+scratch/
