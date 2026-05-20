@@ -152,9 +152,30 @@ function BookPage() {
       return;
     }
 
-    const bookingsToInsert = slots.map((s) => {
+    // Fetch any existing bookings for these slots
+    const { data: existingBookings, error: fetchError } = await supabase
+      .from("zenturf_bookings_v2")
+      .select("id, slot_id, status")
+      .in("slot_id", ids);
+
+    if (fetchError) {
+      console.error("Failed to fetch existing bookings:", fetchError);
+    }
+
+    // Verify if any slot is already booked and confirmed
+    const confirmedBooking = existingBookings?.find((b) => b.status === "confirmed");
+    if (confirmedBooking) {
+      toast.error("One or more selected slots are already booked.");
+      setPaying(false);
+      return;
+    }
+
+    const bookingsToUpsert = slots.map((s) => {
       const pricePerSlot = total / slots.length;
+      const existing = existingBookings?.find((b) => b.slot_id === s.id);
+      
       return {
+        id: existing?.id, // Provide the existing primary key to perform an UPDATE instead of INSERT
         user_id: user.id,
         venue_id: venueId,
         slot_id: s.id,
@@ -169,20 +190,9 @@ function BookPage() {
       };
     });
 
-    // Clear any existing non-confirmed bookings for these slots to avoid 409 Conflict (unique slot_id constraint)
-    const { error: deleteError } = await supabase
-      .from("zenturf_bookings_v2")
-      .delete()
-      .in("slot_id", ids)
-      .neq("status", "confirmed");
-
-    if (deleteError) {
-      console.warn("Failed to clear previous pending bookings:", deleteError);
-    }
-
     const { data: insertedList, error } = await supabase
       .from("zenturf_bookings_v2")
-      .insert(bookingsToInsert)
+      .upsert(bookingsToUpsert)
       .select("id, booking_ref");
 
     if (error || !insertedList || insertedList.length === 0) {
