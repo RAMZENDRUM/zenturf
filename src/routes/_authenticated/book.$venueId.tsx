@@ -160,6 +160,13 @@ function BookPage() {
 
     if (fetchError) {
       console.error("Failed to fetch existing bookings:", fetchError);
+      toast.error(
+        fetchError.message?.includes("JWT issued at future")
+          ? "Your device clock is out of sync. Please adjust your system date and time settings."
+          : `Failed to verify slot availability: ${fetchError.message}`
+      );
+      setPaying(false);
+      return;
     }
 
     // Verify if any slot is already booked and confirmed
