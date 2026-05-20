@@ -31,6 +31,10 @@ import {
   Volume2,
   ThermometerSnowflake,
   Tv,
+  Menu,
+  Upload,
+  Link2,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -177,10 +181,13 @@ function OwnerPortalPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<string>("dashboard");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Local state for adding/editing venues
   const [isVenueDialogOpen, setIsVenueDialogOpen] = useState(false);
   const [editingVenue, setEditingVenue] = useState<Venue | null>(null);
+  const [isSavingVenue, setIsSavingVenue] = useState(false);
+  const [photoLinkInput, setPhotoLinkInput] = useState("");
   const [venueFormData, setVenueFormData] = useState({
     name: "",
     type: "Football Turf",
@@ -430,9 +437,114 @@ function OwnerPortalPage() {
     setIsVenueDialogOpen(true);
   };
 
+  const parseImageLink = (urlStr: string): string => {
+    const trimmed = urlStr.trim();
+    try {
+      const url = new URL(trimmed);
+      
+      // 1. Google search image redirect link (imgurl parameter)
+      if (url.searchParams.has("imgurl")) {
+        const imgurl = url.searchParams.get("imgurl");
+        if (imgurl) return imgurl;
+      }
+      
+      // 2. Extract first image URL found in query parameters if it exists
+      for (const [_, value] of url.searchParams.entries()) {
+        if (value.startsWith("http://") || value.startsWith("https://")) {
+          if (/\.(jpeg|jpg|gif|png|webp|svg)/i.test(value)) {
+            return value;
+          }
+        }
+      }
+      return trimmed;
+    } catch (e) {
+      return trimmed;
+    }
+  };
+
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new window.Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 1024;
+          const MAX_HEIGHT = 1024;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
+          resolve(dataUrl);
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
+  const handleAddPhotoLink = () => {
+    if (!photoLinkInput.trim()) return;
+    const parsedUrl = parseImageLink(photoLinkInput);
+    
+    // Add to photos array
+    setVenueFormData((prev) => ({
+      ...prev,
+      photos: [...prev.photos, parsedUrl],
+    }));
+    setPhotoLinkInput("");
+    toast.success("Image link added!");
+  };
+
+  const handleRemovePhoto = (indexToRemove: number) => {
+    setVenueFormData((prev) => ({
+      ...prev,
+      photos: prev.photos.filter((_, idx) => idx !== indexToRemove),
+    }));
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    const loadingToast = toast.loading("Processing image...");
+    try {
+      const compressedB64 = await compressImage(files[0]);
+      setVenueFormData((prev) => ({
+        ...prev,
+        photos: [...prev.photos, compressedB64],
+      }));
+      toast.dismiss(loadingToast);
+      toast.success("Image uploaded and added successfully!");
+    } catch (err: any) {
+      toast.dismiss(loadingToast);
+      toast.error(`Failed to process image: ${err.message || err}`);
+    }
+  };
+
   const handleSaveVenue = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || isSavingVenue) return;
+    setIsSavingVenue(true);
 
     const payload = {
       name: venueFormData.name,
@@ -472,6 +584,8 @@ function OwnerPortalPage() {
       refetchVenues();
     } catch (err: any) {
       toast.error(`Error saving venue: ${err.message || err}`);
+    } finally {
+      setIsSavingVenue(false);
     }
   };
 
@@ -749,30 +863,117 @@ function OwnerPortalPage() {
         </div>
       </aside>
 
+      {/* Mobile Sidebar Navigation Drawer */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 lg:hidden"
+            />
+            {/* Drawer */}
+            <motion.div
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed inset-y-0 left-0 w-[280px] max-w-[85vw] bg-card border-r shadow-2xl z-50 p-6 flex flex-col justify-between lg:hidden"
+            >
+              <div className="space-y-6">
+                <div className="flex items-center justify-between border-b pb-4">
+                  <span className="font-bold text-lg flex items-center gap-2 text-foreground">
+                    <Building2 className="h-5 w-5 text-primary" />
+                    ZenTurf Portal
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <X className="h-4.5 w-4.5" />
+                  </Button>
+                </div>
+
+                <nav className="space-y-1">
+                  {menuItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setActiveTab(item.id);
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold tracking-tight transition-all duration-200 ${
+                          isActive
+                            ? "bg-foreground text-background shadow-md"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Icon className="h-4.5 w-4.5" />
+                          <span>{item.label}</span>
+                        </div>
+                        {item.count && item.count > 0 ? (
+                          <Badge variant="destructive" className="h-5 min-w-5 rounded-full px-1 flex items-center justify-center text-[10px]">
+                            {item.count}
+                          </Badge>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </nav>
+              </div>
+
+              <div className="border-t pt-4 flex flex-col gap-2">
+                <div className="px-3 py-2 bg-muted/40 rounded-xl">
+                  <p className="text-[9px] text-muted-foreground font-semibold lowercase">logged in as</p>
+                  <p className="text-xs font-bold text-foreground truncate mt-0.5">{user.email}</p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full gap-2 justify-start rounded-xl text-sm h-10 border-destructive/25 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    supabase.auth.signOut();
+                  }}
+                >
+                  <LogOut className="h-4 w-4" /> Sign Out
+                </Button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile Header Bar */}
-        <header className="lg:hidden h-16 border-b flex items-center justify-between px-4 sm:px-6 bg-card/80 backdrop-blur shrink-0">
-          <span className="font-bold text-base text-foreground flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-primary" />
-            ZenTurf Portal
-          </span>
-          <div className="flex items-center gap-3">
-            <Select value={activeTab} onValueChange={setActiveTab}>
-              <SelectTrigger className="w-[180px] h-9">
-                <SelectValue placeholder="Menu" />
-              </SelectTrigger>
-              <SelectContent>
-                {menuItems.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="ghost" size="icon" onClick={() => supabase.auth.signOut()} className="h-9 w-9 text-destructive">
-              <LogOut className="h-4.5 w-4.5" />
+        <header className="lg:hidden h-16 border-b flex items-center justify-between px-4 sm:px-6 bg-card/85 backdrop-blur shrink-0 z-40">
+          <div className="flex items-center gap-2.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-muted-foreground hover:text-foreground"
+              onClick={() => setIsMobileMenuOpen(true)}
+            >
+              <Menu className="h-5 w-5" />
             </Button>
+            <span className="font-bold text-base text-foreground flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-primary" />
+              ZenTurf Portal
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-[10px] font-semibold tracking-wider uppercase border-primary/30 text-primary px-2 py-0.5">
+              Owner
+            </Badge>
           </div>
         </header>
 
@@ -909,7 +1110,8 @@ function OwnerPortalPage() {
                       <h3 className="text-base font-bold text-foreground">Upcoming Bookings</h3>
                       <Badge variant="outline" className="px-2 py-0.5">{stats.upcoming.length} scheduled</Badge>
                     </div>
-                    <div className="overflow-x-auto">
+                    {/* Desktop View Table */}
+                    <div className="hidden md:block overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -946,6 +1148,42 @@ function OwnerPortalPage() {
                           )}
                         </TableBody>
                       </Table>
+                    </div>
+
+                    {/* Mobile View Cards */}
+                    <div className="md:hidden divide-y divide-border/60">
+                      {stats.upcoming.length === 0 ? (
+                        <div className="text-center py-8 text-sm text-muted-foreground">
+                          No upcoming bookings found.
+                        </div>
+                      ) : (
+                        stats.upcoming.slice(0, 5).map((b) => (
+                          <div key={b.id} className="p-4 space-y-2 text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-foreground">{b.booking_ref}</span>
+                              <Badge className="bg-success text-success-foreground text-[10px] px-1.5 py-0">Confirmed</Badge>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-muted-foreground">
+                              <div>
+                                <span className="font-semibold text-foreground text-[10px] block">Venue</span>
+                                {b.zenturf_venues_v2?.name}
+                              </div>
+                              <div>
+                                <span className="font-semibold text-foreground text-[10px] block">Customer</span>
+                                {b.profiles?.name || "Player"}
+                              </div>
+                              <div className="col-span-2">
+                                <span className="font-semibold text-foreground text-[10px] block">Date & Time</span>
+                                {b.booking_date} @ {formatTime(b.start_time)} – {formatTime(b.end_time)}
+                              </div>
+                              <div>
+                                <span className="font-semibold text-foreground text-[10px] block">Price</span>
+                                <span className="font-bold text-foreground">{formatINR(b.total_price)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </Card>
                 </div>
@@ -1075,6 +1313,84 @@ function OwnerPortalPage() {
                           </div>
                         </div>
 
+                        {/* Venue Photos section */}
+                        <div className="space-y-3.5">
+                          <Label className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                            <ImageIcon className="w-4 h-4 text-primary" /> Venue Photos
+                          </Label>
+
+                          {/* Existing Photos Preview Grid */}
+                          {venueFormData.photos.length > 0 && (
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-muted/20 border border-border/60 rounded-xl">
+                              {venueFormData.photos.map((photo, index) => (
+                                <div key={index} className="group relative aspect-video rounded-lg overflow-hidden border border-border/50 shadow-sm bg-muted">
+                                  <img src={photo} alt={`Venue photo ${index + 1}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <Button
+                                      type="button"
+                                      variant="destructive"
+                                      size="icon"
+                                      className="h-8 w-8 rounded-full"
+                                      onClick={() => handleRemovePhoto(index)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                  <span className="absolute bottom-1 left-1.5 text-[9px] bg-black/60 text-white px-1.5 py-0.5 rounded font-mono">
+                                    #{index + 1}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Add Photo Inputs */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* Upload Section */}
+                            <div className="border-2 border-dashed border-border/80 hover:border-primary/50 rounded-xl p-4 flex flex-col items-center justify-center text-center space-y-2 bg-muted/10 transition-colors relative cursor-pointer group">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                onChange={handlePhotoUpload}
+                              />
+                              <div className="p-2.5 bg-primary/10 rounded-full text-primary group-hover:scale-110 transition-transform">
+                                <Upload className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-foreground">Upload from Device</p>
+                                <p className="text-[10px] text-muted-foreground mt-0.5">Drag & drop or tap to select image</p>
+                              </div>
+                            </div>
+
+                            {/* Paste URL Section */}
+                            <div className="border border-border/80 rounded-xl p-4 flex flex-col justify-between space-y-3.5 bg-muted/5">
+                              <div className="space-y-1">
+                                <p className="text-xs font-bold text-foreground flex items-center gap-1">
+                                  <Link2 className="w-3.5 h-3.5 text-primary" /> Add via Web Link
+                                </p>
+                                <p className="text-[10px] text-muted-foreground">Paste image URL, Google search link, or browser link</p>
+                              </div>
+                              <div className="flex gap-2">
+                                <Input
+                                  value={photoLinkInput}
+                                  onChange={(e) => setPhotoLinkInput(e.target.value)}
+                                  placeholder="https://example.com/photo.jpg"
+                                  className="h-9 text-xs rounded-lg flex-1"
+                                />
+                                <Button
+                                  type="button"
+                                  onClick={handleAddPhotoLink}
+                                  size="sm"
+                                  className="h-9 rounded-lg"
+                                >
+                                  Add
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
                         {/* Auditorium-specific details */}
                         {venueFormData.type === "Auditorium" && (
                           <div className="border border-primary/20 rounded-xl p-4 bg-primary/5 space-y-4 animate-in fade-in">
@@ -1105,8 +1421,10 @@ function OwnerPortalPage() {
                         )}
 
                         <DialogFooter>
-                          <Button type="button" variant="outline" onClick={() => setIsVenueDialogOpen(false)}>Cancel</Button>
-                          <Button type="submit">Save Venue</Button>
+                          <Button type="button" variant="outline" onClick={() => setIsVenueDialogOpen(false)} disabled={isSavingVenue}>Cancel</Button>
+                          <Button type="submit" disabled={isSavingVenue}>
+                            {isSavingVenue ? "Saving..." : "Save Venue"}
+                          </Button>
                         </DialogFooter>
                       </form>
                     </DialogContent>
@@ -1183,9 +1501,9 @@ function OwnerPortalPage() {
                   </div>
 
                   {/* Venue + Date Selector Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                     {/* Left Controls Panel */}
-                    <div className="space-y-4">
+                    <div className="space-y-4 lg:col-span-1">
                       {/* Venue + Date */}
                       <Card className="p-5 border bg-card rounded-2xl space-y-4">
                         <h3 className="text-sm font-bold text-foreground">Select Venue & Date</h3>
@@ -1212,6 +1530,169 @@ function OwnerPortalPage() {
                         </div>
                       </Card>
 
+                      {/* Desktop-only Controls: show on desktop under selector */}
+                      <div className="hidden lg:block space-y-4">
+                        {/* Generate Slots Card */}
+                        <Card className="p-5 border bg-card rounded-2xl space-y-4">
+                          <h3 className="text-sm font-bold text-foreground">Generate Slots</h3>
+                          <p className="text-[11px] text-muted-foreground">Create hourly slots for the selected venue & date. Existing slots will be preserved.</p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs">Start Hour (0–23)</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="23"
+                                value={genStartHour}
+                                onChange={(e) => setGenStartHour(e.target.value)}
+                                placeholder="6"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs">End Hour (0–23)</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                max="24"
+                                value={genEndHour}
+                                onChange={(e) => setGenEndHour(e.target.value)}
+                                placeholder="22"
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Price per Slot (₹)</Label>
+                            <Input
+                              type="number"
+                              value={genHourlyRate}
+                              onChange={(e) => setGenHourlyRate(Number(e.target.value))}
+                              placeholder="1000"
+                            />
+                          </div>
+                          <Button
+                            className="w-full rounded-xl"
+                            onClick={() =>
+                              handleGenerateSlots(Number(genStartHour), Number(genEndHour), genHourlyRate)
+                            }
+                            disabled={!selectedVenueForAvailability || !selectedDateForAvailability}
+                          >
+                            Generate Slots
+                          </Button>
+                        </Card>
+
+                        {/* Bulk Actions */}
+                        <Card className="p-5 border bg-card rounded-2xl space-y-4">
+                          <h3 className="text-sm font-bold text-foreground">Bulk Actions</h3>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleBlockAllDay(true)}
+                              className="rounded-lg text-destructive border-destructive/40 hover:bg-destructive/10"
+                            >
+                              Block All Day
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleBlockAllDay(false)}
+                              className="rounded-lg"
+                            >
+                              Unblock All
+                            </Button>
+                          </div>
+                        </Card>
+                      </div>
+                    </div>
+
+                    {/* Slots Grid */}
+                    <Card className="lg:col-span-2 rounded-2xl border overflow-hidden bg-card">
+                      <div className="p-5 border-b bg-muted/10 flex items-center justify-between">
+                        <div>
+                          <h3 className="text-base font-bold">Hourly Slots — {selectedDateForAvailability}</h3>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{slots.length} slots loaded. Click price to edit inline.</p>
+                        </div>
+                        <Badge variant="outline">{slots.filter((s) => !s.is_booked).length} available</Badge>
+                      </div>
+
+                      <div className="p-5">
+                        {slots.length === 0 ? (
+                          <div className="text-center py-16 text-muted-foreground text-sm space-y-3">
+                            <p className="font-medium">No slots found for this date.</p>
+                            <p className="text-xs">Use "Generate Slots" below to create hourly time slots.</p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                            {slots.map((s) => {
+                              const isBooked = s.is_booked && s.booked_by;
+                              const isBlocked = s.is_booked && !s.booked_by;
+                              const slotPrice = s.price_override ?? 0;
+
+                              return (
+                                <div
+                                  key={s.id}
+                                  className={`rounded-xl border flex flex-col gap-2 p-3 transition-all ${
+                                    isBooked
+                                      ? "bg-muted/30 border-muted/50 text-muted-foreground"
+                                      : isBlocked
+                                        ? "bg-destructive/10 border-destructive/30 text-destructive"
+                                        : "bg-background border-border hover:border-primary/40"
+                                  }`}
+                                >
+                                  {/* Time + Lock Icon */}
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-mono text-xs font-bold">{formatTime(s.start_time)}</span>
+                                    {isBooked ? (
+                                      <Lock className="w-3.5 h-3.5 opacity-40" />
+                                    ) : isBlocked ? (
+                                      <Lock className="w-3.5 h-3.5 text-destructive" />
+                                    ) : (
+                                      <Unlock className="w-3.5 h-3.5 opacity-30" />
+                                    )}
+                                  </div>
+
+                                  {/* Status Label */}
+                                  <span className={`text-[10px] font-semibold leading-none ${isBooked ? "text-muted-foreground" : isBlocked ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+                                    {isBooked ? "● Booked" : isBlocked ? "⊘ Blocked" : "✓ Available"}
+                                  </span>
+
+                                  {/* Price Edit (only for non-booked) */}
+                                  {!isBooked && (
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-[10px] text-muted-foreground">₹</span>
+                                      <input
+                                        type="number"
+                                        defaultValue={slotPrice}
+                                        onBlur={(e) => {
+                                          const val = Number(e.target.value);
+                                          if (!isNaN(val) && val !== slotPrice) {
+                                            handleUpdateSlotPrice(s.id, val);
+                                          }
+                                        }}
+                                        className="w-full text-[11px] font-bold bg-transparent border-b border-dashed border-muted-foreground/40 focus:outline-none focus:border-primary pb-0.5"
+                                      />
+                                    </div>
+                                  )}
+
+                                  {/* Block / Unblock Button */}
+                                  {!isBooked && (
+                                    <button
+                                      onClick={() => handleToggleSlotBlock(s.id, isBlocked)}
+                                      className={`text-[9px] font-bold leading-none text-left underline ${isBlocked ? "text-primary" : "text-destructive"}`}
+                                    >
+                                      {isBlocked ? "Unblock" : "Block"}
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+
+                    {/* Mobile-only Controls: show on mobile at the bottom */}
+                    <div className="block lg:hidden space-y-4 lg:col-span-1">
                       {/* Generate Slots Card */}
                       <Card className="p-5 border bg-card rounded-2xl space-y-4">
                         <h3 className="text-sm font-bold text-foreground">Generate Slots</h3>
@@ -1283,92 +1764,6 @@ function OwnerPortalPage() {
                         </div>
                       </Card>
                     </div>
-
-                    {/* Slots Grid */}
-                    <Card className="md:col-span-2 rounded-2xl border overflow-hidden bg-card">
-                      <div className="p-5 border-b bg-muted/10 flex items-center justify-between">
-                        <div>
-                          <h3 className="text-base font-bold">Hourly Slots — {selectedDateForAvailability}</h3>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">{slots.length} slots loaded. Click price to edit inline.</p>
-                        </div>
-                        <Badge variant="outline">{slots.filter((s) => !s.is_booked).length} available</Badge>
-                      </div>
-
-                      <div className="p-5">
-                        {slots.length === 0 ? (
-                          <div className="text-center py-16 text-muted-foreground text-sm space-y-3">
-                            <p className="font-medium">No slots found for this date.</p>
-                            <p className="text-xs">Use "Generate Slots" on the left to create hourly time slots.</p>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                            {slots.map((s) => {
-                              const isBooked = s.is_booked && s.booked_by;
-                              const isBlocked = s.is_booked && !s.booked_by;
-                              const slotPrice = s.price_override ?? 0;
-
-                              return (
-                                <div
-                                  key={s.id}
-                                  className={`rounded-xl border flex flex-col gap-2 p-3 transition-all ${
-                                    isBooked
-                                      ? "bg-muted/30 border-muted/50 text-muted-foreground"
-                                      : isBlocked
-                                        ? "bg-destructive/10 border-destructive/30 text-destructive"
-                                        : "bg-background border-border hover:border-primary/40"
-                                  }`}
-                                >
-                                  {/* Time + Lock Icon */}
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-mono text-xs font-bold">{formatTime(s.start_time)}</span>
-                                    {isBooked ? (
-                                      <Lock className="w-3.5 h-3.5 opacity-40" />
-                                    ) : isBlocked ? (
-                                      <Lock className="w-3.5 h-3.5 text-destructive" />
-                                    ) : (
-                                      <Unlock className="w-3.5 h-3.5 opacity-30" />
-                                    )}
-                                  </div>
-
-                                  {/* Status Label */}
-                                  <span className={`text-[10px] font-semibold leading-none ${isBooked ? "text-muted-foreground" : isBlocked ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
-                                    {isBooked ? "● Booked" : isBlocked ? "⊘ Blocked" : "✓ Available"}
-                                  </span>
-
-                                  {/* Price Edit (only for non-booked) */}
-                                  {!isBooked && (
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-[10px] text-muted-foreground">₹</span>
-                                      <input
-                                        type="number"
-                                        defaultValue={slotPrice}
-                                        onBlur={(e) => {
-                                          const val = Number(e.target.value);
-                                          if (!isNaN(val) && val !== slotPrice) {
-                                            handleUpdateSlotPrice(s.id, val);
-                                          }
-                                        }}
-                                        className="w-full text-[11px] font-bold bg-transparent border-b border-dashed border-muted-foreground/40 focus:outline-none focus:border-primary pb-0.5"
-                                      />
-                                    </div>
-                                  )}
-
-                                  {/* Block / Unblock Button */}
-                                  {!isBooked && (
-                                    <button
-                                      onClick={() => handleToggleSlotBlock(s.id, isBlocked)}
-                                      className={`text-[9px] font-bold leading-none text-left underline ${isBlocked ? "text-primary" : "text-destructive"}`}
-                                    >
-                                      {isBlocked ? "Unblock" : "Block"}
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </Card>
                   </div>
                 </div>
               )}
@@ -1387,7 +1782,8 @@ function OwnerPortalPage() {
                       <h3 className="text-base font-bold text-foreground">Venue Bookings List</h3>
                       <Badge variant="outline">{bookings.length} total bookings</Badge>
                     </div>
-                    <div className="overflow-x-auto">
+                    {/* Desktop View Table */}
+                    <div className="hidden md:block overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -1464,6 +1860,77 @@ function OwnerPortalPage() {
                           )}
                         </TableBody>
                       </Table>
+                    </div>
+
+                    {/* Mobile Card List View */}
+                    <div className="md:hidden divide-y divide-border/60">
+                      {bookings.length === 0 ? (
+                        <div className="text-center py-10 text-sm text-muted-foreground">
+                          No bookings found for your venues.
+                        </div>
+                      ) : (
+                        bookings.map((b) => (
+                          <div key={b.id} className="p-5 space-y-4">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-sm text-foreground">{b.booking_ref}</span>
+                              <div className="flex items-center gap-2">
+                                <Badge variant={b.payment_status === "paid" ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+                                  {b.payment_status}
+                                </Badge>
+                                <Badge
+                                  className={
+                                    b.status === "confirmed"
+                                      ? "bg-success text-success-foreground text-[10px] px-1.5 py-0"
+                                      : b.status === "pending"
+                                        ? "bg-amber-500 text-amber-950 text-[10px] px-1.5 py-0"
+                                        : "bg-destructive/10 text-destructive text-[10px] px-1.5 py-0"
+                                  }
+                                >
+                                  {b.status}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                              <div>
+                                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">Venue</span>
+                                <span className="font-medium text-foreground">{b.zenturf_venues_v2?.name}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">Customer</span>
+                                <span className="font-medium text-foreground">{b.profiles?.name || "Player"}</span>
+                                <span className="text-[10px] text-muted-foreground block truncate">{b.profiles?.email}</span>
+                              </div>
+                              <div className="col-span-2">
+                                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">Date & Time</span>
+                                <span className="font-medium text-foreground">
+                                  {b.booking_date} @ {formatTime(b.start_time)} – {formatTime(b.end_time)}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">Amount</span>
+                                <span className="font-bold text-foreground">{formatINR(b.total_price)}</span>
+                              </div>
+                            </div>
+
+                            {/* Actions block */}
+                            {b.status === "pending" ? (
+                              <div className="flex gap-2 pt-1">
+                                <Button size="sm" className="flex-1 bg-success text-success-foreground hover:bg-success/90 h-9 rounded-lg" onClick={() => handleBookingAction(b, "confirmed")}>
+                                  <Check className="h-4 w-4 mr-1.5" /> Accept
+                                </Button>
+                                <Button size="sm" variant="destructive" className="flex-1 h-9 rounded-lg" onClick={() => handleBookingAction(b, "rejected")}>
+                                  <X className="h-4 w-4 mr-1.5" /> Reject
+                                </Button>
+                              </div>
+                            ) : b.status === "cancelled" && b.payment_status === "paid" ? (
+                              <Button size="sm" variant="outline" className="w-full h-9 rounded-lg" onClick={() => handleRefundBooking(b)}>
+                                Refund
+                              </Button>
+                            ) : null}
+                          </div>
+                        ))
+                      )}
                     </div>
                   </Card>
                 </div>
@@ -1607,7 +2074,8 @@ function OwnerPortalPage() {
                     <div className="p-5 border-b bg-muted/10">
                       <h3 className="text-base font-bold">Transaction Ledger</h3>
                     </div>
-                    <div className="overflow-x-auto">
+                    {/* Desktop View */}
+                    <div className="hidden md:block overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -1644,6 +2112,46 @@ function OwnerPortalPage() {
                           )}
                         </TableBody>
                       </Table>
+                    </div>
+
+                    {/* Mobile View */}
+                    <div className="md:hidden divide-y divide-border/60">
+                      {bookings.filter((b) => b.payment_status === "paid" || b.payment_status === "refunded").length === 0 ? (
+                        <div className="text-center py-8 text-sm text-muted-foreground">
+                          No transactions recorded yet.
+                        </div>
+                      ) : (
+                        bookings.filter((b) => b.payment_status === "paid" || b.payment_status === "refunded").map((b) => (
+                          <div key={b.id} className="p-4 space-y-2 text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono font-bold text-foreground">
+                                {b.payment_id || `ZP-${b.id.substring(0, 8)}`}
+                              </span>
+                              <Badge className={b.payment_status === "paid" ? "bg-success text-success-foreground text-[10px] px-1.5 py-0" : "bg-destructive/15 text-destructive text-[10px] px-1.5 py-0"}>
+                                {b.payment_status}
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-muted-foreground">
+                              <div>
+                                <span className="font-semibold text-foreground text-[10px] block">Booking Ref</span>
+                                {b.booking_ref}
+                              </div>
+                              <div>
+                                <span className="font-semibold text-foreground text-[10px] block">Method</span>
+                                ZenPay Wallet
+                              </div>
+                              <div>
+                                <span className="font-semibold text-foreground text-[10px] block">Amount</span>
+                                <span className="font-bold text-foreground">{formatINR(b.total_price)}</span>
+                              </div>
+                              <div>
+                                <span className="font-semibold text-foreground text-[10px] block">Date</span>
+                                {new Date(b.created_at).toLocaleDateString()}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </Card>
                 </div>

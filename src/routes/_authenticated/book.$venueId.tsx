@@ -204,7 +204,7 @@ function BookPage() {
     const mainRef = insertedList.map((b) => b.booking_ref).join(", ");
     const mainBooking = insertedList[0];
 
-    const loaded = await loadScript("https://zenwalletcore-engine-production.up.railway.app/ZenPay-sdk.js");
+    const loaded = await loadScript("https://zenpay-production.up.railway.app/ZenPay-sdk.js");
     if (!loaded || !(window as any).ZenPay) {
       toast.error("Failed to load ZenPay SDK");
       setPaying(false);
@@ -213,7 +213,7 @@ function BookPage() {
 
     const ZenPayClass = (window as any).ZenPay;
     const zenpay = new ZenPayClass({
-      key: "pk_live_36110d85cbaa8b021189378d15b3",
+      key: "pk_live_9ea8b4f840fffa2ffb491a68869890e5",
       onSuccess: async (paymentResult: any) => {
         toast.success("Payment Successful!");
 

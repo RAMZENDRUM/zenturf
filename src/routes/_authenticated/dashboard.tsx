@@ -29,7 +29,9 @@ type Booking = {
   payment_status: string;
   qr_code_data: string | null;
   refund_amount: number;
-  venues: { name: string; city: string | null; address: string | null } | null;
+  cancellation_reason: string | null;
+  sport_type: string | null;
+  venues: { name: string; city: string | null; address: string | null; type: string } | null;
 };
 
 type Notification = {
@@ -50,7 +52,7 @@ function Dashboard() {
       const { data, error } = await supabase
         .from("zenturf_bookings_v2")
         .select(
-          "id,booking_ref,booking_date,start_time,end_time,total_price,status,payment_status,qr_code_data,refund_amount,venues(name,city,address)",
+          "id,booking_ref,booking_date,start_time,end_time,total_price,status,payment_status,qr_code_data,refund_amount,cancellation_reason,sport_type,venues(name,city,address,type)",
         )
         .eq("user_id", user!.id)
         .order("booking_date", { ascending: false });
@@ -115,11 +117,13 @@ function Dashboard() {
   const upcoming = bookings.filter(
     (b) =>
       b.status !== "cancelled" &&
+      b.status !== "rejected" &&
       new Date(`${b.booking_date}T${b.start_time}`) >= now,
   );
   const past = bookings.filter(
     (b) =>
       b.status === "cancelled" ||
+      b.status === "rejected" ||
       new Date(`${b.booking_date}T${b.start_time}`) < now,
   );
 
@@ -270,6 +274,62 @@ function Dashboard() {
   );
 }
 
+function getStatusConfig(status: string, cancellationReason: string | null) {
+  switch (status) {
+    case "confirmed":
+      return {
+        bg: "bg-emerald-50 dark:bg-emerald-950/10",
+        border: "border-emerald-100 dark:border-emerald-900/20",
+        text: "text-emerald-700 dark:text-emerald-400",
+        badgeBg: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
+        label: "Confirmed",
+        dot: "bg-emerald-500",
+        ping: "bg-emerald-400",
+      };
+    case "cancelled":
+      const isUser = cancellationReason?.toLowerCase().includes("user") || !cancellationReason;
+      return {
+        bg: "bg-red-50/50 dark:bg-red-950/5",
+        border: "border-red-100 dark:border-red-900/20",
+        text: "text-red-700 dark:text-red-400",
+        badgeBg: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+        label: isUser ? "Cancelled by You" : "Cancelled by Owner",
+        dot: "bg-red-500",
+        ping: "bg-red-400",
+      };
+    case "rejected":
+      return {
+        bg: "bg-orange-50/50 dark:bg-orange-950/5",
+        border: "border-orange-100 dark:border-orange-900/20",
+        text: "text-orange-700 dark:text-orange-400",
+        badgeBg: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
+        label: "Rejected by Owner",
+        dot: "bg-orange-500",
+        ping: "bg-orange-400",
+      };
+    case "completed":
+      return {
+        bg: "bg-gray-50 dark:bg-gray-900/5",
+        border: "border-gray-100 dark:border-gray-800/20",
+        text: "text-gray-600 dark:text-gray-400",
+        badgeBg: "bg-gray-100 text-gray-800 dark:bg-gray-800/40 dark:text-gray-400",
+        label: "Completed",
+        dot: "bg-gray-400",
+        ping: "bg-gray-300",
+      };
+    default:
+      return {
+        bg: "bg-amber-50 dark:bg-amber-950/5",
+        border: "border-amber-100 dark:border-amber-900/20",
+        text: "text-amber-700 dark:text-amber-400",
+        badgeBg: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+        label: status || "Pending",
+        dot: "bg-amber-500",
+        ping: "bg-amber-400",
+      };
+  }
+}
+
 function BookingCard({
   b,
   onCancel,
@@ -281,9 +341,11 @@ function BookingCard({
 }) {
   const refund = calculateRefund(b.booking_date, b.start_time, b.total_price);
   const qrString = b.qr_code_data || JSON.stringify({ ref: b.booking_ref });
+  const config = getStatusConfig(b.status, b.cancellation_reason);
+  const isCancelled = b.status === "cancelled" || b.status === "rejected";
   
   return (
-    <Card className="overflow-hidden border border-border/80 hover:border-primary/30 transition-all duration-300 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-elegant)] rounded-2xl bg-card">
+    <Card className={`overflow-hidden border transition-all duration-300 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-elegant)] rounded-2xl bg-card ${config.border} ${isCancelled ? "opacity-90" : ""}`}>
       <div className="flex flex-col md:flex-row">
         {/* Ticket Left Section: Venue Details & Info */}
         <div className="flex-1 p-6 flex flex-col justify-between border-b md:border-b-0 md:border-r border-dashed border-border/80">
@@ -294,11 +356,11 @@ function BookingCard({
               </span>
               <div className="flex items-center gap-2">
                 <span className="relative flex h-2 w-2">
-                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${b.status === "cancelled" ? "bg-red-400" : "bg-emerald-400"}`}></span>
-                  <span className={`relative inline-flex rounded-full h-2 w-2 ${b.status === "cancelled" ? "bg-red-500" : "bg-emerald-500"}`}></span>
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${config.ping}`}></span>
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${config.dot}`}></span>
                 </span>
-                <span className={`text-xs font-semibold capitalize ${b.status === "cancelled" ? "text-red-500" : "text-emerald-500"}`}>
-                  {b.status}
+                <span className={`text-xs font-semibold capitalize ${config.text}`}>
+                  {config.label}
                 </span>
               </div>
             </div>
@@ -349,9 +411,35 @@ function BookingCard({
             </div>
           </div>
 
-          {b.refund_amount > 0 && (
-            <div className="mt-4 p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-              Refunded: {formatINR(b.refund_amount)} (Successfully processed back to wallet)
+          {/* Cancellation Details */}
+          {isCancelled && (
+            <div className="mt-5 p-4 rounded-xl bg-destructive/5 dark:bg-destructive/10 border border-destructive/10 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-destructive/80">Cancellation Status</span>
+                <Badge variant="destructive" className="text-[9px] py-0 px-2 font-semibold">
+                  {b.status === "cancelled" ? "Cancelled" : "Rejected"}
+                </Badge>
+              </div>
+              <div className="text-xs text-foreground space-y-1.5">
+                {b.cancellation_reason && (
+                  <p className="flex flex-col sm:flex-row sm:justify-between">
+                    <span className="text-muted-foreground">Reason:</span>
+                    <span className="font-semibold text-foreground text-left sm:text-right">{b.cancellation_reason}</span>
+                  </p>
+                )}
+                {b.refund_amount > 0 ? (
+                  <p className="flex justify-between items-center bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20 mt-1">
+                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">Refunded to Wallet:</span>
+                    <span className="font-extrabold text-emerald-600 dark:text-emerald-400">{formatINR(b.refund_amount)}</span>
+                  </p>
+                ) : (
+                  b.payment_status === "paid" && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 italic">
+                      Refund is pending review or manual action by the venue owner.
+                    </p>
+                  )
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -369,6 +457,16 @@ function BookingCard({
             <div className="text-center py-4">
               <span className="text-3xl filter grayscale opacity-40">🚫</span>
               <p className="text-xs text-muted-foreground mt-2 font-medium">Booking Cancelled</p>
+            </div>
+          ) : b.status === "rejected" ? (
+            <div className="text-center py-4">
+              <span className="text-3xl filter grayscale opacity-40">❌</span>
+              <p className="text-xs text-muted-foreground mt-2 font-medium">Request Rejected</p>
+            </div>
+          ) : b.status === "pending" ? (
+            <div className="text-center py-4">
+              <span className="text-3xl animate-pulse inline-block">⏳</span>
+              <p className="text-xs text-muted-foreground mt-2 font-medium">Awaiting Confirmation</p>
             </div>
           ) : (
             <div className="text-center py-4">

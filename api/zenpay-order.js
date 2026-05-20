@@ -18,7 +18,7 @@ export default async function handler(req, res) {
 
     console.log(`Creating ZenPay order for amount: ${amountInPaise} paise...`);
 
-    const response = await fetch("https://zenwalletcore-engine-production.up.railway.app/v1/orders", {
+    const response = await fetch("https://zenpay-production.up.railway.app/v1/orders", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${secretKey}`,
