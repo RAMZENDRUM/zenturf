@@ -234,35 +234,29 @@ function BookPage() {
       return;
     }
 
-    const messageListener = async (event: MessageEvent) => {
-      if (!event.data || event.data.source !== "ZenPay-checkout") return;
-      const { type } = event.data;
-      if (type === "MODAL_CLOSE") {
-        console.log("[ZenPay] Modal closed by user");
+    const handleModalClose = async () => {
+      console.log("[ZenPay] Modal closed by user");
+      
+      // Check if booking was already confirmed by onSuccess
+      const { data: currentBooking } = await supabase
+        .from("zenturf_bookings_v2")
+        .select("status")
+        .eq("id", mainBooking.id)
+        .single();
         
-        // Wait, check if booking was already confirmed by onSuccess
-        const { data: currentBooking } = await supabase
+      if (currentBooking && currentBooking.status !== "confirmed") {
+        await supabase
           .from("zenturf_bookings_v2")
-          .select("status")
-          .eq("id", mainBooking.id)
-          .single();
-          
-        if (currentBooking && currentBooking.status !== "confirmed") {
-          await supabase
-            .from("zenturf_bookings_v2")
-            .update({
-              status: "cancelled",
-              cancellation_reason: "Payment window closed by user"
-            })
-            .eq("id", mainBooking.id);
-        }
-        
-        setPaying(false);
-        window.removeEventListener("message", messageListener);
-        navigate({ to: "/dashboard", search: { showReceiptId: mainBooking.id } as any });
+          .update({
+            status: "cancelled",
+            cancellation_reason: "Payment window closed by user"
+          })
+          .eq("id", mainBooking.id);
       }
+      
+      setPaying(false);
+      navigate({ to: "/dashboard", search: { showReceiptId: mainBooking.id } as any });
     };
-    window.addEventListener("message", messageListener);
 
     const ZenPayClass = (window as any).ZenPay;
     const zenpay = new ZenPayClass({
@@ -298,7 +292,6 @@ function BookPage() {
           `[ZenPay] Booking ${mainRef} confirmed at ${venue.name} on ${slot.date} ${formattedStart} – ${formattedEnd}`,
         );
 
-        window.removeEventListener("message", messageListener);
         navigate({ to: "/dashboard", search: { showReceiptId: mainBooking.id } as any });
       },
       onFailure: async (error: any) => {
@@ -313,9 +306,9 @@ function BookPage() {
           .eq("zenpay_order_id", orderId);
 
         setPaying(false);
-        window.removeEventListener("message", messageListener);
         navigate({ to: "/dashboard", search: { showReceiptId: mainBooking.id } as any });
-      }
+      },
+      onClose: handleModalClose,
     });
 
     zenpay.open({
