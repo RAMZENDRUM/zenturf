@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,6 +14,9 @@ import { toast } from "sonner";
 import { Copy } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    showReceiptId: (search.showReceiptId as string) ?? "",
+  }),
   head: () => ({ meta: [{ title: "Dashboard — ZenTurf" }] }),
   component: Dashboard,
 });
@@ -45,6 +48,8 @@ type Notification = {
 function Dashboard() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const { showReceiptId } = Route.useSearch();
+  const navigate = useNavigate();
 
   const { data: bookings = [] } = useQuery({
     queryKey: ["my-bookings", user?.id],
@@ -61,6 +66,8 @@ function Dashboard() {
     },
     enabled: !!user,
   });
+
+  const receiptBooking = bookings.find((b) => b.id === showReceiptId);
 
   const { data: notifications = [] } = useQuery({
     queryKey: ["my-notifs", user?.id],
@@ -270,6 +277,101 @@ function Dashboard() {
           )}
         </TabsContent>
       </Tabs>
+
+      {receiptBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md bg-card border rounded-3xl shadow-2xl overflow-hidden p-6 animate-in zoom-in-95 duration-200">
+            {/* Top colored line indicator */}
+            {receiptBooking.status === "confirmed" && (
+              <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-400" />
+            )}
+            {receiptBooking.status === "cancelled" && (
+              <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-red-400 via-rose-500 to-red-400" />
+            )}
+
+            {/* Header */}
+            <div className="text-center pb-5 border-b border-dashed border-border/80 relative">
+              {/* Ticket Punch Holes */}
+              <div className="absolute -left-9 bottom-[-10px] w-6 h-6 rounded-full bg-background border" />
+              <div className="absolute -right-9 bottom-[-10px] w-6 h-6 rounded-full bg-background border" />
+
+              <div className="mx-auto size-12 bg-accent/20 rounded-full flex items-center justify-center text-xl mb-3">
+                🎫
+              </div>
+              <h2 className="text-xl font-bold tracking-tight text-foreground">Booking Receipt</h2>
+              <p className="text-xs text-muted-foreground mt-1">Ref ID: {receiptBooking.booking_ref}</p>
+            </div>
+
+            {/* Content Details */}
+            <div className="py-6 space-y-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Venue</span>
+                  <h3 className="text-base font-bold text-foreground mt-0.5">{receiptBooking.venues?.name}</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">{receiptBooking.venues?.address || receiptBooking.venues?.city}</p>
+                </div>
+                <Badge variant={receiptBooking.status === "confirmed" ? "default" : "destructive"} className="text-xs capitalize px-2.5 py-0.5 font-semibold">
+                  {receiptBooking.status}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">Sport Type</span>
+                  <span className="text-sm font-semibold text-foreground capitalize mt-0.5 block text-left">
+                    {receiptBooking.sport_type || "Sports"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">Session Date</span>
+                  <span className="text-sm font-semibold text-foreground mt-0.5 block text-left">
+                    {new Date(receiptBooking.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">Time Window</span>
+                  <span className="text-sm font-semibold text-foreground mt-0.5 block text-left">
+                    {formatTime(receiptBooking.start_time)} – {formatTime(receiptBooking.end_time)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">Net Charged</span>
+                  <span className="text-sm font-bold text-primary mt-0.5 block text-left">
+                    {formatINR(receiptBooking.total_price)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Status Specific details / QR or Alert */}
+              {receiptBooking.status === "confirmed" && receiptBooking.qr_code_data && (
+                <div className="flex flex-col items-center gap-2 pt-4 border-t border-border/40">
+                  <div className="bg-white p-3 rounded-2xl border shadow-sm">
+                    <QRCodeCanvas value={receiptBooking.qr_code_data} size={120} />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground font-semibold tracking-wider uppercase mt-1">Scan at venue entry gate</span>
+                </div>
+              )}
+
+              {(receiptBooking.status === "cancelled" || receiptBooking.status === "rejected") && (
+                <div className="p-4 rounded-2xl bg-destructive/5 border border-destructive/10 text-center text-xs space-y-1">
+                  <p className="font-semibold text-destructive">Payment / Booking Cancelled</p>
+                  <p className="text-muted-foreground">Reason: {receiptBooking.cancellation_reason || "Aborted by user"}</p>
+                  {receiptBooking.refund_amount > 0 && (
+                    <p className="text-emerald-600 font-bold mt-1">Refunded to Wallet: {formatINR(receiptBooking.refund_amount)}</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col gap-2 pt-4 border-t border-border/80">
+              <Button onClick={() => navigate({ to: "/dashboard", search: {} as any })} className="w-full font-semibold rounded-xl">
+                Done & View Dashboard
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

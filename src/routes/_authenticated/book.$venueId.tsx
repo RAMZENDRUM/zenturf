@@ -223,6 +223,36 @@ function BookPage() {
       return;
     }
 
+    const messageListener = async (event: MessageEvent) => {
+      if (!event.data || event.data.source !== "ZenPay-checkout") return;
+      const { type } = event.data;
+      if (type === "MODAL_CLOSE") {
+        console.log("[ZenPay] Modal closed by user");
+        
+        // Wait, check if booking was already confirmed by onSuccess
+        const { data: currentBooking } = await supabase
+          .from("zenturf_bookings_v2")
+          .select("status")
+          .eq("id", mainBooking.id)
+          .single();
+          
+        if (currentBooking && currentBooking.status !== "confirmed") {
+          await supabase
+            .from("zenturf_bookings_v2")
+            .update({
+              status: "cancelled",
+              cancellation_reason: "Payment window closed by user"
+            })
+            .eq("id", mainBooking.id);
+        }
+        
+        setPaying(false);
+        window.removeEventListener("message", messageListener);
+        navigate({ to: "/dashboard", search: { showReceiptId: mainBooking.id } as any });
+      }
+    };
+    window.addEventListener("message", messageListener);
+
     const ZenPayClass = (window as any).ZenPay;
     const zenpay = new ZenPayClass({
       key: "pk_live_9ea8b4f840fffa2ffb491a68869890e5",
@@ -257,13 +287,23 @@ function BookPage() {
           `[ZenPay] Booking ${mainRef} confirmed at ${venue.name} on ${slot.date} ${formattedStart} – ${formattedEnd}`,
         );
 
-        setBookingRef(mainRef);
-        setQrData(qr);
-        setStep(4);
+        window.removeEventListener("message", messageListener);
+        navigate({ to: "/dashboard", search: { showReceiptId: mainBooking.id } as any });
       },
-      onFailure: (error: any) => {
+      onFailure: async (error: any) => {
         toast.error(`Payment failed: ${error?.message || "Transaction aborted."}`);
+        
+        await supabase
+          .from("zenturf_bookings_v2")
+          .update({
+            status: "cancelled",
+            cancellation_reason: error?.message || "Payment declined/failed"
+          })
+          .eq("zenpay_order_id", orderId);
+
         setPaying(false);
+        window.removeEventListener("message", messageListener);
+        navigate({ to: "/dashboard", search: { showReceiptId: mainBooking.id } as any });
       }
     });
 
