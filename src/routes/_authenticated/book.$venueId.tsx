@@ -169,6 +169,17 @@ function BookPage() {
       };
     });
 
+    // Clear any existing non-confirmed bookings for these slots to avoid 409 Conflict (unique slot_id constraint)
+    const { error: deleteError } = await supabase
+      .from("zenturf_bookings_v2")
+      .delete()
+      .in("slot_id", ids)
+      .neq("status", "confirmed");
+
+    if (deleteError) {
+      console.warn("Failed to clear previous pending bookings:", deleteError);
+    }
+
     const { data: insertedList, error } = await supabase
       .from("zenturf_bookings_v2")
       .insert(bookingsToInsert)
