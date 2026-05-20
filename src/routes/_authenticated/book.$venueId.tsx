@@ -124,27 +124,31 @@ function BookPage() {
 
     let orderId = "";
     try {
-      const response = await fetch("/api/zenpay/order", {
+      const secretKey = import.meta.env.VITE_ZENPAY_SECRET_KEY;
+      const response = await fetch("https://zenpay-production.up.railway.app/v1/orders", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Authorization": `Bearer ${secretKey}`,
+          "Idempotency-Key": `idemp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           amount: amountInPaise,
-          receipt: receiptId
-        })
+          currency: "INR",
+          receipt: receiptId,
+        }),
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error("ZenPay Order API Error Response:", errorText);
-        throw new Error(`Server returned status ${response.status}: ${errorText}`);
+        throw new Error(`ZenPay returned status ${response.status}: ${errorText}`);
       }
-      
+
       const resData = await response.json();
-      orderId = resData?.orderId || "";
+      orderId = resData?.data?.id || "";
       if (!orderId) {
-        throw new Error("Failed to retrieve order ID from backend response");
+        throw new Error("Failed to retrieve order ID from ZenPay response");
       }
     } catch (err: any) {
       toast.error(`Order creation failed: ${err.message || err}`);

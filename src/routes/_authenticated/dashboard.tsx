@@ -34,7 +34,7 @@ type Booking = {
   refund_amount: number;
   cancellation_reason: string | null;
   sport_type: string | null;
-  venues: { name: string; city: string | null; address: string | null; type: string } | null;
+  zenturf_venues_v2: { name: string; city: string | null; address: string | null; type: string } | null;
 };
 
 type Notification = {
@@ -57,7 +57,7 @@ function Dashboard() {
       const { data, error } = await supabase
         .from("zenturf_bookings_v2")
         .select(
-          "id,booking_ref,booking_date,start_time,end_time,total_price,status,payment_status,qr_code_data,refund_amount,cancellation_reason,sport_type,venues(name,city,address,type)",
+          "id,booking_ref,booking_date,start_time,end_time,total_price,status,payment_status,qr_code_data,refund_amount,cancellation_reason,sport_type,zenturf_venues_v2(name,city,address,type)",
         )
         .eq("user_id", user!.id)
         .order("booking_date", { ascending: false });
@@ -307,8 +307,8 @@ function Dashboard() {
               <div className="flex justify-between items-start">
                 <div>
                   <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Venue</span>
-                  <h3 className="text-base font-bold text-foreground mt-0.5">{receiptBooking.venues?.name}</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">{receiptBooking.venues?.address || receiptBooking.venues?.city}</p>
+                  <h3 className="text-base font-bold text-foreground mt-0.5">{receiptBooking.zenturf_venues_v2?.name}</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">{receiptBooking.zenturf_venues_v2?.address || receiptBooking.zenturf_venues_v2?.city}</p>
                 </div>
                 <Badge variant={receiptBooking.status === "confirmed" ? "default" : "destructive"} className="text-xs capitalize px-2.5 py-0.5 font-semibold">
                   {receiptBooking.status}
@@ -454,7 +454,7 @@ function BookingCard({
           <div>
             <div className="flex items-center justify-between gap-3 mb-3">
               <span className="text-[10px] uppercase font-bold tracking-widest text-primary bg-primary/10 px-2.5 py-1 rounded-full">
-                {b.venues?.type || b.sport_type || "Booking"}
+                {b.zenturf_venues_v2?.type || b.sport_type || "Booking"}
               </span>
               <div className="flex items-center gap-2">
                 <span className="relative flex h-2 w-2">
@@ -467,10 +467,10 @@ function BookingCard({
               </div>
             </div>
             
-            <h3 className="text-xl font-bold tracking-tight text-foreground">{b.venues?.name}</h3>
+            <h3 className="text-xl font-bold tracking-tight text-foreground">{b.zenturf_venues_v2?.name}</h3>
             <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
               <span className="inline-block h-3 w-3 rounded-full bg-accent/20 flex items-center justify-center">📍</span>
-              {b.venues?.address || b.venues?.city || "Chennai"}
+              {b.zenturf_venues_v2?.address || b.zenturf_venues_v2?.city || "Chennai"}
             </p>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6">
