@@ -155,7 +155,7 @@ function BookPage() {
     // Fetch any existing bookings for these slots
     const { data: existingBookings, error: fetchError } = await supabase
       .from("zenturf_bookings_v2")
-      .select("id, slot_id, status")
+      .select("id, slot_id, status, user_id")
       .in("slot_id", ids);
 
     if (fetchError) {
@@ -169,10 +169,16 @@ function BookPage() {
       return;
     }
 
-    // Verify if any slot is already booked and confirmed
-    const confirmedBooking = existingBookings?.find((b) => b.status === "confirmed");
-    if (confirmedBooking) {
-      toast.error("One or more selected slots are already booked.");
+    // Verify if any slot is already booked and active (confirmed, or pending by another user)
+    const activeBooking = existingBookings?.find(
+      (b) => b.status === "confirmed" || (b.status === "pending" && b.user_id !== user.id)
+    );
+    if (activeBooking) {
+      toast.error(
+        activeBooking.status === "confirmed"
+          ? "One or more selected slots are already booked."
+          : "One or more selected slots are currently being booked by another user. Please choose a different slot."
+      );
       setPaying(false);
       return;
     }
@@ -208,7 +214,12 @@ function BookPage() {
       .select("id, booking_ref");
 
     if (error || !insertedList || insertedList.length === 0) {
-      toast.error(error?.message ?? "Error saving booking. Please contact support.");
+      const isDuplicate = error?.code === "23505" || error?.message?.toLowerCase().includes("unique_active_slot");
+      toast.error(
+        isDuplicate
+          ? "This slot has just been reserved by another user. Please choose a different slot."
+          : (error?.message ?? "Error saving booking. Please contact support.")
+      );
       setPaying(false);
       return;
     }
