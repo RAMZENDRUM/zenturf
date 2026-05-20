@@ -16,11 +16,11 @@
     },
     {
       "source": "/api/zenpay/order",
-      "destination": "/api/zenpay-order.js"
+      "destination": "/api/zenpay-order"
     },
     {
       "source": "/api/zenpay/webhook",
-      "destination": "/api/zenpay-webhook.js"
+      "destination": "/api/zenpay-webhook"
     },
     {
       "source": "/(.*)",
