@@ -125,13 +125,13 @@ function Dashboard() {
     (b) =>
       b.status !== "cancelled" &&
       b.status !== "rejected" &&
-      new Date(`${b.booking_date}T${b.start_time}`) >= now,
+      new Date(`${b.booking_date}T${b.end_time || b.start_time}`) >= now,
   );
   const past = bookings.filter(
     (b) =>
       b.status === "cancelled" ||
       b.status === "rejected" ||
-      new Date(`${b.booking_date}T${b.start_time}`) < now,
+      new Date(`${b.booking_date}T${b.end_time || b.start_time}`) < now,
   );
 
   const cancelBooking = async (b: Booking) => {
@@ -435,7 +435,7 @@ function getStatusConfig(status: string, cancellationReason: string | null) {
 function BookingCard({
   b,
   onCancel,
-  showQR,
+  showQR = true,
 }: {
   b: Booking;
   onCancel?: () => void;
