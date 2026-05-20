@@ -209,7 +209,7 @@ function BookPage() {
     const mainRef = insertedList.map((b) => b.booking_ref).join(", ");
     const mainBooking = insertedList[0];
 
-    const loaded = await loadScript("https://zenpay-production.up.railway.app/ZenPay-sdk.js");
+    const loaded = await loadScript("https://zenpay-production.up.railway.app/zenpay-sdk.js");
     if (!loaded || !(window as any).ZenPay) {
       toast.error("Failed to load ZenPay SDK");
       setPaying(false);
