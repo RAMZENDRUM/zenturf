@@ -120,36 +120,53 @@ function BookPage() {
     };
 
     const amountInPaise = Math.round(total * 100);
+    if (!amountInPaise || amountInPaise <= 0) {
+      toast.error("Invalid booking amount. Please try again or contact support.");
+      setPaying(false);
+      return;
+    }
     const receiptId = `rcpt-${Date.now()}`;
 
     let orderId = "";
     try {
-      const secretKey = import.meta.env.VITE_ZENPAY_SECRET_KEY;
-      const response = await fetch("https://zenpay-production.up.railway.app/v1/orders", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${secretKey}`,
-          "Idempotency-Key": `idemp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          amount: amountInPaise,
-          currency: "INR",
-          receipt: receiptId,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("ZenPay Order API Error Response:", errorText);
-        throw new Error(`ZenPay returned status ${response.status}: ${errorText}`);
+      // Try the server-side route first (works on Vercel)
+      let resData: any = null;
+      try {
+        const serverResp = await fetch("/api/zenpay/order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: amountInPaise, receipt: receiptId }),
+        });
+        if (serverResp.ok) {
+          const json = await serverResp.json();
+          if (json?.orderId) resData = { data: { id: json.orderId } };
+        }
+      } catch {
+        // Server route not available (Cloudflare Workers) – fall through
       }
 
-      const resData = await response.json();
+      // Fallback: call ZenPay directly from client
+      if (!resData?.data?.id) {
+        const secretKey = import.meta.env.VITE_ZENPAY_SECRET_KEY;
+        if (!secretKey) throw new Error("ZenPay secret key not configured. Please contact support.");
+        const response = await fetch("https://zenpay-production.up.railway.app/v1/orders", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${secretKey}`,
+            "Idempotency-Key": `idemp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ amount: amountInPaise, currency: "INR", receipt: receiptId }),
+        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`ZenPay returned status ${response.status}: ${errorText}`);
+        }
+        resData = await response.json();
+      }
+
       orderId = resData?.data?.id || "";
-      if (!orderId) {
-        throw new Error("Failed to retrieve order ID from ZenPay response");
-      }
+      if (!orderId) throw new Error("Failed to retrieve order ID from ZenPay response");
     } catch (err: any) {
       toast.error(`Order creation failed: ${err.message || err}`);
       setPaying(false);
