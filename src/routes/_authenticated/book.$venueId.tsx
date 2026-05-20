@@ -174,8 +174,7 @@ function BookPage() {
       const pricePerSlot = total / slots.length;
       const existing = existingBookings?.find((b) => b.slot_id === s.id);
       
-      return {
-        id: existing?.id, // Provide the existing primary key to perform an UPDATE instead of INSERT
+      const item: any = {
         user_id: user.id,
         venue_id: venueId,
         slot_id: s.id,
@@ -188,6 +187,12 @@ function BookPage() {
         zenpay_order_id: orderId,
         status: "pending" as any,
       };
+
+      if (existing?.id) {
+        item.id = existing.id;
+      }
+
+      return item;
     });
 
     const { data: insertedList, error } = await supabase
