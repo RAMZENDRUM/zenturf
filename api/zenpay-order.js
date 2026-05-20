@@ -35,8 +35,8 @@ export default async function handler(req, res) {
     const data = await response.json();
     console.log("ZenPay Core Engine response status:", response.status, data);
 
-    if (!response.ok || !data.success) {
-      return res.status(response.status || 500).json({
+    if (!response.ok || data.status !== "success") {
+      return res.status(response.status === 200 ? 500 : (response.status || 500)).json({
         error: "Failed to create order on ZenPay Core Engine",
         details: data,
       });
